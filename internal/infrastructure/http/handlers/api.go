@@ -22,6 +22,7 @@ func (h *API) PostPullRequestCreate(w http.ResponseWriter, r *http.Request) {
 		slog.String("op", op),
 		slog.String("request_id", middleware.GetRequestID(r)),
 	)
+
 }
 
 // Пометить PR как MERGED (идемпотентная операция)
@@ -53,6 +54,3 @@ func (h *API) GetUsersGetReview(w http.ResponseWriter, r *http.Request, params o
 // (POST /users/setIsActive)
 func (h *API) PostUsersSetIsActive(w http.ResponseWriter, r *http.Request) {
 }
-
-// Установить флаг активности пользователя
-// (POST /users/setIsActive)

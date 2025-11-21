@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 
+	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	gormpg "gorm.io/driver/postgres"
-	_ "github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -36,14 +36,27 @@ func New(cfg Config, log *slog.Logger) (*PostgresStorage, error) {
 		slog.String("op", op),
 	)
 
-
 	sqlDB, err := sql.Open("postgres", cfg.DSN)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w: %w", op, ErrOpenDB, err)
 	}
-	log.Info("start migrate.,.")
+	log.Info("start migrate...", slog.String("path", cfg.MigrationsPath))
 	if err := goose.Up(sqlDB, cfg.MigrationsPath); err != nil {
 		return nil, fmt.Errorf("%s: %w: %w", op, ErrMigration, err)
+	}
+	//DB seed
+	log.Info("start seeding...")
+
+	if cfg.Seed {
+		if err := SeedTeams(sqlDB, 20); err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		if err := SeedUsers(sqlDB, 200); err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
+		if err := AssignUsersToTeams(sqlDB); err != nil {
+			return nil, fmt.Errorf("%s: %w", op, err)
+		}
 	}
 
 	gormDB, err := gorm.Open(gormpg.New(gormpg.Config{

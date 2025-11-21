@@ -7,6 +7,8 @@ database:
   password: "postgres"
   dbname: "pullrequest"
   sslmode: "disable"
+  seed: true
+  migration_path: "/app/internal/infrastructure/storage/postgres/migrations"
 
 http_server:
   address: "0.0.0.0:8080"

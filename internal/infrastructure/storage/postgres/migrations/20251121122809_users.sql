@@ -1,10 +1,10 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE users (
-    user_id TEXT PRIMARY KEY,
+    user_id BIGSERIAL PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
-    is_active BOOLEAN NOT NULL DEFAULT FALSE,
-    team_name TEXT NOT NULL REFERENCES teams(team_name)
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    team_name TEXT REFERENCES teams(team_name)
 );
 -- +goose StatementEnd
 

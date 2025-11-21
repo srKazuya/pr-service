@@ -39,10 +39,14 @@ func main() {
 			cfg.DataBase.Dbname,
 			cfg.DataBase.Sslmode,
 		),
-		MigrationsPath: "internal/infrastructure/storage/postgres/migrations",
+		Seed:           cfg.DataBase.Seed,
+		MigrationsPath: cfg.DataBase.MigrationsPath,
 	}
 
-	log.Info("CHECKING DB Conn,", slog.String("Trying to connect with DSN", pgConfig.DSN))
+	log.Info("CHECKING DB Conn,",
+		slog.String("Trying to connect with DSN", pgConfig.DSN),
+		slog.String("MiogrationPath", pgConfig.MigrationsPath))
+
 	storage, err := postgres.New(pgConfig, log)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
