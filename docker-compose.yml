@@ -1,5 +1,5 @@
 services:
-  qa_postgres:
+  pr_postgres:
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
@@ -11,16 +11,17 @@ services:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 2s
-      timeout: 3s
-      retries: 5
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      qa_postgres:
+      pr_postgres:
         condition: service_healthy
     environment:
       CONFIG_PATH: /app/config/dev.yaml

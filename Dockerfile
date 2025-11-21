@@ -6,7 +6,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o pq-app ./cmd/question_answer
+RUN CGO_ENABLED=0 GOOS=linux go build -o pq-app ./cmd/pr
 
 
 FROM alpine:3.19
@@ -18,5 +18,5 @@ COPY --from=builder /app/config /app/config
 COPY --from=builder /app/internal/infrastructure/storage/postgres/migrations \
     /app/internal/infrastructure/storage/postgres/migrations
 
-EXPOSE 8082
+EXPOSE 8080
 CMD ["./pq-app"]

@@ -10,6 +10,7 @@ import (
 	"pr-service/internal/domain/pr"
 	"pr-service/internal/infrastructure/http/handlers"
 	mw "pr-service/internal/infrastructure/http/middleware"
+	"pr-service/internal/infrastructure/http/openapi"
 	"pr-service/internal/infrastructure/storage/postgres"
 	"pr-service/pkg/sl_logger/sl"
 	"pr-service/pkg/sl_logger/slogpretty"
@@ -42,7 +43,7 @@ func main() {
 	}
 
 	log.Info("CHECKING DB Conn,", slog.String("Trying to connect with DSN", pgConfig.DSN))
-	storage, err := postgres.New(pgConfig)
+	storage, err := postgres.New(pgConfig, log)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 	}
@@ -58,7 +59,7 @@ func main() {
 	r.Use(mw.NewMWLogger(log))
 	api := &handlers.API{Log: log, Svc: service}
 
-	
+	openapi.HandlerFromMux(api, r)
 
 	srv := &http.Server{
 		Addr:         cfg.Address,
