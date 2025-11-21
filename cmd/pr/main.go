@@ -3,16 +3,19 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"log/slog"
 	"net/http"
 	"os"
 	"pr-service/internal/config"
+	"pr-service/internal/domain/pr"
+	"pr-service/internal/infrastructure/http/handlers"
 	mw "pr-service/internal/infrastructure/http/middleware"
 	"pr-service/internal/infrastructure/storage/postgres"
 	"pr-service/pkg/sl_logger/sl"
 	"pr-service/pkg/sl_logger/slogpretty"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
@@ -45,6 +48,7 @@ func main() {
 	}
 
 	_ = storage
+	service := pr.NewService(storage)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -52,6 +56,8 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.URLFormat)
 	r.Use(mw.NewMWLogger(log))
+	api := &handlers.API{Log: log, Svc: service}
+
 	
 
 	srv := &http.Server{
