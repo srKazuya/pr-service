@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,9 +16,6 @@ import (
 	"pr-service/internal/infrastructure/storage/postgres"
 	"pr-service/pkg/sl_logger/sl"
 	"pr-service/pkg/sl_logger/slogpretty"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 const (
@@ -50,10 +49,11 @@ func main() {
 	storage, err := postgres.New(pgConfig, log)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
+		os.Exit(1)
 	}
 
 	_ = storage
-	service := pr.NewService(storage)
+	service := pr.NewService(storage, log)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

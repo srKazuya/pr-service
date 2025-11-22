@@ -28,9 +28,9 @@ func SeedUsers(db *sql.DB, count int) error {
 
 	for i := 0; i < count; i++ {
 		_, err := db.Exec(`
-            INSERT INTO users (username)
-            VALUES ($1)
-        `, gofakeit.Username())
+            INSERT INTO users (username, user_id)
+            VALUES ($1, $2)
+        `, gofakeit.Username(), gofakeit.ID())
 
 		if err != nil {
 			return err
@@ -59,16 +59,16 @@ func GetTeams(db *sql.DB) ([]string, error) {
 	return teams, rows.Err()
 }
 
-func GetUsers(db *sql.DB) ([]int64, error) {
+func GetUsers(db *sql.DB) ([]string, error) {
 	rows, err := db.Query(`SELECT user_id FROM users ORDER BY user_id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var users []int64
+	var users []string
 	for rows.Next() {
-		var id int64
+		var id string
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
@@ -77,6 +77,7 @@ func GetUsers(db *sql.DB) ([]int64, error) {
 
 	return users, rows.Err()
 }
+
 
 func AssignUsersToTeams(db *sql.DB) error {
 	teams, err := GetTeams(db)
