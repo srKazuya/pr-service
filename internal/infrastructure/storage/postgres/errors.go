@@ -9,6 +9,7 @@ var (
 	ErrOpenDB          = errors.New("failed to open database")
 	ErrMigration       = errors.New("failed to run migrations")
 	ErrGormOpen        = errors.New("failed to gorm open")
+	ErrReviewerNotInPR = errors.New("reviewer not in pr")
 )
 
 type codedError struct {
@@ -37,8 +38,12 @@ var (
 		code:    openapi.PREXISTS,
 		message: "pull request уже существует",
 	}
-	ErrNotAssigned = codedError{
+	ErrAlreadyMerged = codedError{
 		code:    openapi.NOTASSIGNED,
+		message: "pull request уже смержен",
+	}
+	ErrNotAssigned = codedError{
+		code:    openapi.PRMERGED,
 		message: "у пользователя нет команды",
 	}
 )

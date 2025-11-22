@@ -2,6 +2,7 @@ package api_dto
 
 import (
 	"pr-service/internal/domain/pr"
+	"pr-service/internal/infrastructure/http/openapi"
 	"time"
 )
 
@@ -15,6 +16,13 @@ type PostPullRequestCreateJSONBody struct {
 
 type PostPullRequestMergeJSONBody struct {
 	PullRequestId string `json:"pull_request_id" validate:"required"`
+}
+
+func PostPullRequestReassignToModel(req openapi.PostPullRequestReassignJSONBody) pr.PostPullRequestReassign {
+	return pr.PostPullRequestReassign{
+		OldUserId:     req.OldUserId,
+		PullRequestId: req.PullRequestId,
+	}
 }
 
 func PostPullRequestMapToModel(req PostPullRequestCreateJSONBody) pr.PullRequest {

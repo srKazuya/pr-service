@@ -10,6 +10,7 @@ import (
 type Service interface {
 	PullRequestCreate(ctx context.Context, pr PullRequest) (PullRequest, error)
 	PullRequestMerge(ctx context.Context, id string) (PullRequest, error)
+	PullRequestReassign(ctx context.Context, r PostPullRequestReassign) (PullRequest, error)
 }
 
 type service struct {
@@ -84,9 +85,13 @@ func (s *service) PullRequestMerge(ctx context.Context, id string) (PullRequest,
 	return pr, nil
 }
 
-// //type User struct {
-//     IsActive bool   `json:"is_active"`
-//     TeamName string `json:"team_name"`
-//     UserId   string `json:"user_id"`
-//     Username string `json:"username"`
-// }
+func (s *service) PullRequestReassign(ctx context.Context, r PostPullRequestReassign) (PullRequest, error) {
+const op = "service.pull_request.Reassign"
+
+	prResp, err := s.storage.PullRequestReassign(r)
+	if err != nil {
+		return PullRequest{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return prResp, nil
+}

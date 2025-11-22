@@ -19,6 +19,7 @@ type PullRequest struct {
 
 type User struct {
     UserID string `gorm:"column:user_id;primaryKey;type:text"`
+	TeamName string `gorm:"column:team_name;type:text;foreignKey:team_name;references:TeamName"`
 }
 
 type PullRequestReviewer struct {

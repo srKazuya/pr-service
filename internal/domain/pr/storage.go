@@ -13,7 +13,7 @@ type Storage interface {
 	PullRequestMerge(id string) (PullRequest, error)
 	// // Переназначить конкретного ревьювера на другого из его команды
 	// // (POST /pullRequest/reassign)
-	// PullRequestReassign()
+	PullRequestReassign(r PostPullRequestReassign) (PullRequest, error)
 	// // Создать команду с участниками (создаёт/обновляет пользователей)
 	// // (POST /team/add)
 	// TeamAdd()

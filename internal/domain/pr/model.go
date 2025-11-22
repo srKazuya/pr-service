@@ -4,7 +4,7 @@ import "time"
 
 type PullRequest struct {
 	// AssignedReviewers user_id назначенных ревьюверов (0..2)
-	AssignedReviewers []string   `gorm:"many2many:pull_request_reviewers;joinForeignKey:PullRequestId;joinReferences:UserId"`
+	AssignedReviewers []string   
 	AuthorId          string     `json:"author_id"`
 	CreatedAt         *time.Time `json:"createdAt"`
 	MergedAt          *time.Time `json:"mergedAt"`
@@ -18,4 +18,9 @@ type User struct {
 	TeamName string `json:"team_name"`
 	UserId   string `gorm:"primaryKey" json:"user_id" `
 	Username string `json:"username"`
+}
+
+type PostPullRequestReassign struct {
+	OldUserId     string `json:"old_user_id"`
+	PullRequestId string `json:"pull_request_id"`
 }

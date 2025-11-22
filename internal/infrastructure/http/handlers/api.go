@@ -82,10 +82,8 @@ func (h *API) PostPullRequestCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Log.Info("pullRequest CREATE", slog.Any("title", svcPr.PullRequestName))
-	pullRequestCreateOK(w, svcPr)
+	pullRequestOK(w, svcPr)
 }
-
-
 
 // Пометить PR как MERGED (идемпотентная операция)
 // (POST /pullRequest/merge)
@@ -98,7 +96,7 @@ func (h *API) PostPullRequestMerge(w http.ResponseWriter, r *http.Request) {
 	)
 
 	var req dto.PostPullRequestMergeJSONBody
-	
+
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		h.Log.Error("bad request",
@@ -116,14 +114,12 @@ func (h *API) PostPullRequestMerge(w http.ResponseWriter, r *http.Request) {
 	}
 	h.Log.Info("request body decoded", slog.Any("req", req))
 
-
 	if err := validator.New().Struct(req); err != nil {
 		validateErr := err.(validator.ValidationErrors)
 		h.Log.Error("invalid request", sl.Err(err))
 		_ = transport.WriteJSON(w, http.StatusBadRequest, validateResp.ValidationError(validateErr))
 		return
 	}
-
 
 	svcPr, err := h.Svc.PullRequestMerge(r.Context(), req.PullRequestId)
 	if errors.Is(err, postgres.ErrNotFound) {
@@ -144,12 +140,63 @@ func (h *API) PostPullRequestMerge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Log.Info("pullRequPullRequestMerged", slog.Any("title", svcPr.PullRequestName))
-	pullRequestMergeOK(w, svcPr)
+	pullRequestOK(w, svcPr)
 }
 
 // Переназначить конкретного ревьювера на другого из его команды
 // (POST /pullRequest/reassign)
 func (h *API) PostPullRequestReassign(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.PostPullRequestMerge"
+
+	h.Log = h.Log.With(
+		slog.String("op", op),
+		slog.String("request_id", middleware.GetRequestID(r)),
+	)
+
+	var req openapi.PostPullRequestReassignJSONBody
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusBadRequest, transport.ErrInvalidRequest.Error())
+		return
+	}
+	h.Log.Info("request body decoded", slog.Any("req", req))
+
+	if err := validator.New().Struct(req); err != nil {
+		validateErr := err.(validator.ValidationErrors)
+		h.Log.Error("invalid request", sl.Err(err))
+		_ = transport.WriteJSON(w, http.StatusBadRequest, validateResp.ValidationError(validateErr))
+		return
+	}
+
+	prReassign := dto.PostPullRequestReassignToModel(req)
+	updatedPR, err := h.Svc.PullRequestReassign(r.Context(), prReassign)
+
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrNotFound): 
+			responseErr(w, http.StatusNotFound, postgres.ErrNotFound.Error())
+		case errors.Is(err, postgres.ErrReviewerNotInPR):
+			responseErr(w, http.StatusBadRequest, postgres.ErrReviewerNotInPR.Error())
+		case errors.Is(err, postgres.ErrNotAssigned):
+			responseErr(w, http.StatusBadRequest, postgres.ErrNotAssigned.Error())
+		case errors.Is(err, postgres.ErrAlreadyMerged):
+			responseErr(w, http.StatusBadRequest, postgres.ErrAlreadyMerged.Error())
+		default:
+			h.Log.Error("reassign failed", sl.Err(err))
+			responseErr(w, http.StatusInternalServerError, "failed to reassign reviewer")
+		}
+		return
+	}
+
+	h.Log.Info("reviewer reassigned",
+		slog.String("pr_id", updatedPR.PullRequestId),
+	)
+
+	pullRequestOK(w, updatedPR)
 }
 
 // Создать команду с участниками (создаёт/обновляет пользователей)
@@ -172,7 +219,6 @@ func (h *API) GetUsersGetReview(w http.ResponseWriter, r *http.Request, params o
 func (h *API) PostUsersSetIsActive(w http.ResponseWriter, r *http.Request) {
 }
 
-
 func responseErr(w http.ResponseWriter, c int, m string) {
 	resp := openapi.ErrorResponse{
 		Error: struct {
@@ -186,22 +232,16 @@ func responseErr(w http.ResponseWriter, c int, m string) {
 	transport.WriteJSON(w, c, resp)
 }
 
-func pullRequestCreateOK(w http.ResponseWriter, pr pr.PullRequest) {
-	r := openapi.PullRequestShort{
+func pullRequestOK(w http.ResponseWriter, pr pr.PullRequest) {
+	r := openapi.PullRequest{
+		AssignedReviewers: pr.AssignedReviewers,
+		CreatedAt: pr.CreatedAt,
+		MergedAt: pr.MergedAt,
 		AuthorId:        pr.AuthorId,
 		PullRequestId:   pr.PullRequestId,
 		PullRequestName: pr.PullRequestName,
-		Status:          openapi.PullRequestShortStatus(pr.Status),
+		Status:          openapi.PullRequestStatus(pr.Status),
 	}
 	transport.WriteJSON(w, http.StatusOK, r)
 }
 
-func pullRequestMergeOK(w http.ResponseWriter, pr pr.PullRequest) {
-	r := openapi.PullRequestShort{
-		AuthorId:        pr.AuthorId,
-		PullRequestId:   pr.PullRequestId,
-		PullRequestName: pr.PullRequestName,
-		Status:          openapi.PullRequestShortStatus(pr.Status),
-	}
-	transport.WriteJSON(w, http.StatusOK, r)
-}

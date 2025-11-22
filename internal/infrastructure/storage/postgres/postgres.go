@@ -175,46 +175,135 @@ func (p *PostgresStorage) GetFreeReviewers(teamName string, authorUserID string)
 }
 
 func (p *PostgresStorage) PullRequestMerge(id string) (pr.PullRequest, error) {
-    const op = "storage.postgres.PullRequestMerge"
+	const op = "storage.postgres.PullRequestMerge"
 
-    res := p.db.Model(&pgdto.PullRequest{}).
-        Where("pull_request_id = ? AND status = 'OPEN'", id).
-        Updates(map[string]any{
-            "status":    "MERGED",
-            "merged_at": gorm.Expr("NOW()"),
-        })
+	res := p.db.Model(&pgdto.PullRequest{}).
+		Where("pull_request_id = ? AND status = 'OPEN'", id).
+		Updates(map[string]any{
+			"status":    "MERGED",
+			"merged_at": gorm.Expr("NOW()"),
+		})
 
-    if res.Error != nil {
-        return pr.PullRequest{}, fmt.Errorf("%s: %w", op, res.Error)
-    }
+	if res.Error != nil {
+		return pr.PullRequest{}, fmt.Errorf("%s: %w", op, res.Error)
+	}
 
-    if res.RowsAffected == 0 {
-        var prGorm pgdto.PullRequest
-        err := p.db.Preload("AssignedReviewers").
-            Where("pull_request_id = ?", id).
-            First(&prGorm).Error
+	if res.RowsAffected == 0 {
+		var prGorm pgdto.PullRequest
+		err := p.db.Preload("AssignedReviewers").
+			Where("pull_request_id = ?", id).
+			First(&prGorm).Error
 
-        if err != nil {
-            if errors.Is(err, gorm.ErrRecordNotFound) {
-                return pr.PullRequest{}, ErrNotFound
-            }
-            return pr.PullRequest{}, fmt.Errorf("%s: %w", op, err)
-        }
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return pr.PullRequest{}, ErrNotFound
+			}
+			return pr.PullRequest{}, fmt.Errorf("%s: %w", op, err)
+		}
 
-        if prGorm.Status == "MERGED" {
-            return prGorm.ToDomain(), nil
-        }
+		if prGorm.Status == "MERGED" {
+			return prGorm.ToDomain(), nil
+		}
 
-        return pr.PullRequest{}, fmt.Errorf("%s: pull request is %s, not OPEN", op, prGorm.Status)
-    }
+		return pr.PullRequest{}, fmt.Errorf("%s: pull request is %s, not OPEN", op, prGorm.Status)
+	}
 
-    var prGorm pgdto.PullRequest
-    if err := p.db.Preload("AssignedReviewers").
-        Where("pull_request_id = ?", id).
-        First(&prGorm).Error; err != nil {
+	var prGorm pgdto.PullRequest
+	if err := p.db.Preload("AssignedReviewers").
+		Where("pull_request_id = ?", id).
+		First(&prGorm).Error; err != nil {
 
-        return pr.PullRequest{}, fmt.Errorf("%s: reload after merge: %w", op, err)
-    }
+		return pr.PullRequest{}, fmt.Errorf("%s: reload after merge: %w", op, err)
+	}
 
-    return prGorm.ToDomain(), nil
+	return prGorm.ToDomain(), nil
+}
+
+// storage/postgres/pull_request.go
+
+func (p *PostgresStorage) PullRequestReassign(r pr.PostPullRequestReassign) (pr.PullRequest, error) {
+	const op = "storage.postgres.PullRequestReassign"
+
+	var prGorm pgdto.PullRequest
+
+	err := p.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Preload("AssignedReviewers").
+			First(&prGorm, "pull_request_id = ?", r.PullRequestId).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		if prGorm.Status == "MERGED" {
+			return ErrAlreadyMerged
+		}
+
+		found := false
+		for _, rev := range prGorm.AssignedReviewers {
+			if rev.UserID == r.OldUserId {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return ErrReviewerNotInPR
+		}
+
+		var author pgdto.User
+		if err := tx.Select("team_name").
+			First(&author, "user_id = ?", prGorm.AuthorID).Error; err != nil {
+			return err
+		}
+
+		if author.TeamName == "" {
+			return ErrNotAssigned
+		}
+
+		var candidate struct{ UserID string }
+		err := tx.Raw(`
+            SELECT user_id
+            FROM users
+            WHERE team_name = ?
+              AND is_active = true
+              AND user_id != ?
+              AND user_id != ?
+              AND user_id NOT IN (
+                SELECT user_id FROM pull_request_reviewers WHERE pull_request_id = ?
+              )
+            LIMIT 1
+        `, author.TeamName, prGorm.AuthorID, r.OldUserId, r.PullRequestId).
+			Scan(&candidate).Error
+
+		if err != nil {
+			return err
+		}
+		if candidate.UserID == "" {
+			return ErrNoCandidate
+		}
+
+		if err := tx.Exec(`
+            DELETE FROM pull_request_reviewers
+            WHERE pull_request_id = ? AND user_id = ?
+        `, r.PullRequestId, r.OldUserId).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec(`
+            INSERT INTO pull_request_reviewers (pull_request_id, user_id)
+            VALUES (?, ?)
+            ON CONFLICT (pull_request_id, user_id) DO NOTHING
+        `, r.PullRequestId, candidate.UserID).Error; err != nil {
+			return err
+		}
+
+		return tx.Preload("AssignedReviewers").
+			First(&prGorm, "pull_request_id = ?", r.PullRequestId).Error
+	})
+
+	if err != nil {
+		return pr.PullRequest{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return prGorm.ToDomain(), nil
 }
