@@ -13,6 +13,9 @@ type PostPullRequestCreateJSONBody struct {
 	PullRequestName string `json:"pull_request_name" validate:"required,min=3"`
 }
 
+type PostPullRequestMergeJSONBody struct {
+	PullRequestId string `json:"pull_request_id" validate:"required"`
+}
 
 func PostPullRequestMapToModel(req PostPullRequestCreateJSONBody) pr.PullRequest {
 	return pr.PullRequest{

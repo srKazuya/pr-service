@@ -25,7 +25,7 @@ type API struct {
 // Создать PR и автоматически назначить до 2 ревьюверов из команды автора
 // (POST /pullRequest/create)
 func (h *API) PostPullRequestCreate(w http.ResponseWriter, r *http.Request) {
-	const op = "hanlers.PostPullRequestCreate"
+	const op = "handlers.PostPullRequestCreate"
 
 	h.Log = h.Log.With(
 		slog.String("op", op),
@@ -40,7 +40,7 @@ func (h *API) PostPullRequestCreate(w http.ResponseWriter, r *http.Request) {
 			slog.String("type", err.Error()),
 			sl.Err(err),
 		)
-		responseErr(w, http.StatusBadRequest, "invalid json body")
+		responseErr(w, http.StatusBadRequest, transport.ErrInvalidRequest.Error())
 		return
 	}
 
@@ -85,32 +85,66 @@ func (h *API) PostPullRequestCreate(w http.ResponseWriter, r *http.Request) {
 	pullRequestCreateOK(w, svcPr)
 }
 
-func responseErr(w http.ResponseWriter, c int, m string) {
-	resp := openapi.ErrorResponse{
-		Error: struct {
-			Code    openapi.ErrorResponseErrorCode "json:\"code\""
-			Message string                         "json:\"message\""
-		}{
-			Code:    openapi.ErrorResponseErrorCode(c),
-			Message: m,
-		},
-	}
-	transport.WriteJSON(w, c, resp)
-}
 
-func pullRequestCreateOK(w http.ResponseWriter, pr pr.PullRequest) {
-	r := openapi.PullRequestShort{
-		AuthorId:        pr.AuthorId,
-		PullRequestId:   pr.PullRequestId,
-		PullRequestName: pr.PullRequestName,
-		Status:          openapi.PullRequestShortStatus(pr.Status),
-	}
-	transport.WriteJSON(w, http.StatusOK, r)
-}
 
 // Пометить PR как MERGED (идемпотентная операция)
 // (POST /pullRequest/merge)
 func (h *API) PostPullRequestMerge(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.PostPullRequestMerge"
+
+	h.Log = h.Log.With(
+		slog.String("op", op),
+		slog.String("request_id", middleware.GetRequestID(r)),
+	)
+
+	var req dto.PostPullRequestMergeJSONBody
+	
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusBadRequest, transport.ErrInvalidRequest.Error())
+		return
+	}
+
+	if req.PullRequestId == "" {
+		h.Log.Warn("pull_request_id is empty")
+		responseErr(w, http.StatusBadRequest, "pull_request_id is required")
+		return
+	}
+	h.Log.Info("request body decoded", slog.Any("req", req))
+
+
+	if err := validator.New().Struct(req); err != nil {
+		validateErr := err.(validator.ValidationErrors)
+		h.Log.Error("invalid request", sl.Err(err))
+		_ = transport.WriteJSON(w, http.StatusBadRequest, validateResp.ValidationError(validateErr))
+		return
+	}
+
+
+	svcPr, err := h.Svc.PullRequestMerge(r.Context(), req.PullRequestId)
+	if errors.Is(err, postgres.ErrNotFound) {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusInternalServerError, postgres.ErrNotFound.Error())
+		return
+	}
+	if err != nil {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusInternalServerError, "failed to PullRequestMerge")
+		return
+	}
+
+	h.Log.Info("pullRequPullRequestMerged", slog.Any("title", svcPr.PullRequestName))
+	pullRequestMergeOK(w, svcPr)
 }
 
 // Переназначить конкретного ревьювера на другого из его команды
@@ -136,4 +170,38 @@ func (h *API) GetUsersGetReview(w http.ResponseWriter, r *http.Request, params o
 // Установить флаг активности пользователя
 // (POST /users/setIsActive)
 func (h *API) PostUsersSetIsActive(w http.ResponseWriter, r *http.Request) {
+}
+
+
+func responseErr(w http.ResponseWriter, c int, m string) {
+	resp := openapi.ErrorResponse{
+		Error: struct {
+			Code    openapi.ErrorResponseErrorCode "json:\"code\""
+			Message string                         "json:\"message\""
+		}{
+			Code:    openapi.ErrorResponseErrorCode(http.StatusText(c)),
+			Message: m,
+		},
+	}
+	transport.WriteJSON(w, c, resp)
+}
+
+func pullRequestCreateOK(w http.ResponseWriter, pr pr.PullRequest) {
+	r := openapi.PullRequestShort{
+		AuthorId:        pr.AuthorId,
+		PullRequestId:   pr.PullRequestId,
+		PullRequestName: pr.PullRequestName,
+		Status:          openapi.PullRequestShortStatus(pr.Status),
+	}
+	transport.WriteJSON(w, http.StatusOK, r)
+}
+
+func pullRequestMergeOK(w http.ResponseWriter, pr pr.PullRequest) {
+	r := openapi.PullRequestShort{
+		AuthorId:        pr.AuthorId,
+		PullRequestId:   pr.PullRequestId,
+		PullRequestName: pr.PullRequestName,
+		Status:          openapi.PullRequestShortStatus(pr.Status),
+	}
+	transport.WriteJSON(w, http.StatusOK, r)
 }

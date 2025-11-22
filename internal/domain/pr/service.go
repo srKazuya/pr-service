@@ -9,6 +9,7 @@ import (
 
 type Service interface {
 	PullRequestCreate(ctx context.Context, pr PullRequest) (PullRequest, error)
+	PullRequestMerge(ctx context.Context, id string) (PullRequest, error)
 }
 
 type service struct {
@@ -21,7 +22,7 @@ func NewService(storage Storage, log *slog.Logger) Service {
 }
 
 func (s *service) PullRequestCreate(ctx context.Context, pr PullRequest) (PullRequest, error) {
-	const op = "service.pullREquest.Create"
+	const op = "service.pullRequest.Create"
 
 	teamName, err := s.storage.GetAuthorTeam(pr.AuthorId)
 	if err != nil {
@@ -44,7 +45,7 @@ func (s *service) PullRequestCreate(ctx context.Context, pr PullRequest) (PullRe
 	}
 	for i, user := range freeUsers {
 		if i >= maxReviewers {
-			break 
+			break
 		}
 		reviewers = append(reviewers, user.UserId)
 
@@ -55,9 +56,8 @@ func (s *service) PullRequestCreate(ctx context.Context, pr PullRequest) (PullRe
 		return PullRequest{}, fmt.Errorf("%s: no available reviewers in team", op)
 	}
 
-
 	newPullRequest := PullRequest{
-		AssignedReviewers: reviewers, 
+		AssignedReviewers: reviewers,
 		AuthorId:          pr.AuthorId,
 		CreatedAt:         pr.CreatedAt,
 		MergedAt:          pr.MergedAt,
@@ -73,6 +73,15 @@ func (s *service) PullRequestCreate(ctx context.Context, pr PullRequest) (PullRe
 	s.log.Info("pull request created", slog.String("pr_id", pr.PullRequestId), slog.Int("reviewers_count", len(reviewers)))
 
 	return newPullRequest, nil
+}
+func (s *service) PullRequestMerge(ctx context.Context, id string) (PullRequest, error) {
+	const op = "service.pullRrquest.Merge"
+
+	pr, err := s.storage.PullRequestMerge(id)
+	if err != nil {
+		return PullRequest{}, fmt.Errorf("%s: %w", op, err)
+	}
+	return pr, nil
 }
 
 // //type User struct {

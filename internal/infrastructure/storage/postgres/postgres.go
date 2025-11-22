@@ -3,9 +3,11 @@ package postgres
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"pr-service/internal/domain/pr"
+	pgdto "pr-service/internal/infrastructure/storage/postgres/dto"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -75,7 +77,7 @@ func (p *PostgresStorage) PullRequestCreate(prEntity pr.PullRequest) error {
 		if prEntity.CreatedAt == nil {
 			prEntity.CreatedAt = &now
 		}
-		
+
 		prToInsert := map[string]interface{}{
 			"pull_request_id":   prEntity.PullRequestId,
 			"pull_request_name": prEntity.PullRequestName,
@@ -104,7 +106,7 @@ func (p *PostgresStorage) PullRequestCreate(prEntity pr.PullRequest) error {
 			}
 		}
 
-		return nil 
+		return nil
 	})
 }
 
@@ -170,4 +172,49 @@ func (p *PostgresStorage) GetFreeReviewers(teamName string, authorUserID string)
 	}
 
 	return users, nil
+}
+
+func (p *PostgresStorage) PullRequestMerge(id string) (pr.PullRequest, error) {
+    const op = "storage.postgres.PullRequestMerge"
+
+    res := p.db.Model(&pgdto.PullRequest{}).
+        Where("pull_request_id = ? AND status = 'OPEN'", id).
+        Updates(map[string]any{
+            "status":    "MERGED",
+            "merged_at": gorm.Expr("NOW()"),
+        })
+
+    if res.Error != nil {
+        return pr.PullRequest{}, fmt.Errorf("%s: %w", op, res.Error)
+    }
+
+    if res.RowsAffected == 0 {
+        var prGorm pgdto.PullRequest
+        err := p.db.Preload("AssignedReviewers").
+            Where("pull_request_id = ?", id).
+            First(&prGorm).Error
+
+        if err != nil {
+            if errors.Is(err, gorm.ErrRecordNotFound) {
+                return pr.PullRequest{}, ErrNotFound
+            }
+            return pr.PullRequest{}, fmt.Errorf("%s: %w", op, err)
+        }
+
+        if prGorm.Status == "MERGED" {
+            return prGorm.ToDomain(), nil
+        }
+
+        return pr.PullRequest{}, fmt.Errorf("%s: pull request is %s, not OPEN", op, prGorm.Status)
+    }
+
+    var prGorm pgdto.PullRequest
+    if err := p.db.Preload("AssignedReviewers").
+        Where("pull_request_id = ?", id).
+        First(&prGorm).Error; err != nil {
+
+        return pr.PullRequest{}, fmt.Errorf("%s: reload after merge: %w", op, err)
+    }
+
+    return prGorm.ToDomain(), nil
 }

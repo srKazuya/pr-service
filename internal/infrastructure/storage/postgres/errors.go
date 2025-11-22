@@ -9,13 +9,6 @@ var (
 	ErrOpenDB          = errors.New("failed to open database")
 	ErrMigration       = errors.New("failed to run migrations")
 	ErrGormOpen        = errors.New("failed to gorm open")
-	ErrGetAllQuestions = errors.New("failed to get all questions")
-	ErrCreateQuestion  = errors.New("failed to create question")
-	ErrGetQuestion     = errors.New("failed to get question")
-	ErrDeleteQuestion  = errors.New("failed to delete question")
-	ErrCreateAnswer    = errors.New("failed to create answer")
-	ErrGetAnswer       = errors.New("failed to get answer")
-	ErrDeleteAnswer    = errors.New("failed to delete answer")
 )
 
 type codedError struct {
