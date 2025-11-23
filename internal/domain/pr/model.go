@@ -36,3 +36,8 @@ type TeamMember struct {
 	UserId   string 
 	Username string 
 }
+
+type TeamName struct {
+	// TeamName Уникальное имя команды
+	TeamName string 
+}

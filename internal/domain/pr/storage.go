@@ -17,7 +17,7 @@ type Storage interface {
 	TeamAdd(t Team) (Team, error)
 	// // Получить команду с участниками
 	// // (GET /team/get)
-	// TeamGet()
+	TeamGet(teamName string)(Team, error)
 	// // Получить PR'ы, где пользователь назначен ревьювером
 	// // (GET /users/getReview)
 	// UsersGetReview()

@@ -18,6 +18,12 @@ type PostPullRequestMergeJSONBody struct {
 	PullRequestId string `json:"pull_request_id" validate:"required"`
 }
 
+func GetTeamToModel(t openapi.GetTeamGetParams) pr.TeamName {
+	return pr.TeamName{
+		TeamName: t.TeamName,
+	}
+}
+
 func PostPullRequestReassignToModel(req openapi.PostPullRequestReassignJSONBody) pr.PostPullRequestReassign {
 	return pr.PostPullRequestReassign{
 		OldUserId:     req.OldUserId,

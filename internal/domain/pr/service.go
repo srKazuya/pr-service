@@ -12,6 +12,7 @@ type Service interface {
 	PullRequestMerge(ctx context.Context, id string) (PullRequest, error)
 	PullRequestReassign(ctx context.Context, r PostPullRequestReassign) (PullRequest, error)
 	TeamAdd(ctx context.Context, r Team) (Team, error)
+	TeamGet(ctx context.Context, r TeamName) (Team, error)
 }
 
 type service struct {
@@ -101,6 +102,16 @@ func (s *service) TeamAdd(ctx context.Context, r Team) (Team, error) {
 	const op = "service.TeamAdd"
 
 	team, err := s.storage.TeamAdd(r)
+	if err != nil {
+		return Team{}, fmt.Errorf("%s: %w", op, err)
+	}
+	return team, err
+}
+
+func (s *service) TeamGet(ctx context.Context, r TeamName) (Team, error) {
+	const op = "service.TeamGet"
+
+	team, err := s.storage.TeamGet(r.TeamName)
 	if err != nil {
 		return Team{}, fmt.Errorf("%s: %w", op, err)
 	}

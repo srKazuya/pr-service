@@ -124,7 +124,6 @@ func (p *PostgresStorage) UsersSetIsActive(userID string) error {
 	return nil
 }
 
-// GetAuthorTeam — возвращает team_name автора
 func (p *PostgresStorage) GetAuthorTeam(userID string) (string, error) {
 	const op = "storage.postgres.GetAuthorTeam"
 	var teamName string
@@ -140,7 +139,6 @@ func (p *PostgresStorage) GetAuthorTeam(userID string) (string, error) {
 	return teamName, nil
 }
 
-// GetFreeReviewers — возвращает свободных активных ревьюеров из той же команды
 func (p *PostgresStorage) GetFreeReviewers(teamName string, authorUserID string) ([]pr.User, error) {
 	const op = "storage.postgres.GetFreeReviewers"
 
@@ -212,8 +210,6 @@ func (p *PostgresStorage) PullRequestMerge(id string) (pr.PullRequest, error) {
 
 	return prGorm.ToDomain(), nil
 }
-
-// storage/postgres/pull_request.go
 
 func (p *PostgresStorage) PullRequestReassign(r pr.PostPullRequestReassign) (pr.PullRequest, error) {
 	const op = "storage.postgres.PullRequestReassign"
@@ -314,7 +310,7 @@ func (p *PostgresStorage) TeamAdd(t pr.Team) (pr.Team, error) {
 	if tx.Error != nil {
 		return pr.Team{}, tx.Error
 	}
-	defer tx.Rollback() 
+	defer tx.Rollback()
 
 	var exists int64
 	if err := tx.Model(&pgdto.TeamModel{}).
@@ -332,7 +328,7 @@ func (p *PostgresStorage) TeamAdd(t pr.Team) (pr.Team, error) {
 
 	for _, m := range t.Members {
 		if m.UserId == "" {
-			return pr.Team{}, ErrNotFound 
+			return pr.Team{}, ErrNotFound
 		}
 		result := tx.Exec(`
 			UPDATE users 
@@ -374,6 +370,41 @@ func (p *PostgresStorage) TeamAdd(t pr.Team) (pr.Team, error) {
 
 	return pr.Team{
 		TeamName: t.TeamName,
+		Members:  members,
+	}, nil
+}
+
+func (p *PostgresStorage) TeamGet(teamName string) (pr.Team, error) {
+	if teamName == "" {
+		return pr.Team{}, fmt.Errorf("team name is required")
+	}
+
+	var userModels []pgdto.UserModel
+
+	err := p.db.
+		Table("users").
+		Where("team_name = ?", teamName).
+		Find(&userModels).Error
+
+	if err != nil {
+		return pr.Team{}, fmt.Errorf("postgres.TeamGet: query failed: %w", err)
+	}
+
+	if len(userModels) == 0 {
+		return pr.Team{}, ErrNotFound 
+	}
+
+	members := make([]pr.TeamMember, 0, len(userModels))
+	for _, u := range userModels {
+		members = append(members, pr.TeamMember{
+			UserId:   u.UserID,
+			Username: u.Username,
+			IsActive: u.IsActive,
+		})
+	}
+
+	return pr.Team{
+		TeamName: teamName,
 		Members:  members,
 	}, nil
 }

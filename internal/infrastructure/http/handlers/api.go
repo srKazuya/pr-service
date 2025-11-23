@@ -255,6 +255,30 @@ func (h *API) PostTeamAdd(w http.ResponseWriter, r *http.Request) {
 // Получить команду с участниками
 // (GET /team/get
 func (h *API) GetTeamGet(w http.ResponseWriter, r *http.Request, params openapi.GetTeamGetParams) {
+	const op = "handlers.GetTeamGet"
+	log := h.Log.With(
+		slog.String("op", op),
+		slog.String("request_id", middleware.GetRequestID(r)),
+		slog.String("team_name", params.TeamName),
+	)
+	teamName := dto.GetTeamToModel(params)
+	team, err := h.Svc.TeamGet(r.Context(), teamName)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrNotFound):
+			log.Warn("team not found")
+			responseErr(w, http.StatusNotFound, "команда не найдена")
+			return
+
+		default:
+			log.Error("failed to get team", sl.Err(err))
+			responseErr(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
+			return
+		}
+	}
+
+	log.Info("team retrieved successfully", slog.Int("members_count", len(team.Members)))
+	teamRequestOK(w, team)
 }
 
 // Получить PR'ы, где пользователь назначен ревьювером
