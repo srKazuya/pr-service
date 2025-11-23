@@ -38,13 +38,7 @@ func New(cfg Config, log *slog.Logger) (*PostgresStorage, error) {
 	log.Info("start seeding...")
 
 	if cfg.Seed {
-		if err := SeedTeams(sqlDB, 20); err != nil {
-			return nil, fmt.Errorf("%s: %w", op, err)
-		}
-		if err := SeedUsers(sqlDB, 200); err != nil {
-			return nil, fmt.Errorf("%s: %w", op, err)
-		}
-		if err := AssignUsersToTeams(sqlDB); err != nil {
+		if err := SeedUsersWithTeams(sqlDB); err != nil {
 			return nil, fmt.Errorf("%s: %w", op, err)
 		}
 	}
@@ -306,4 +300,80 @@ func (p *PostgresStorage) PullRequestReassign(r pr.PostPullRequestReassign) (pr.
 	}
 
 	return prGorm.ToDomain(), nil
+}
+
+func (p *PostgresStorage) TeamAdd(t pr.Team) (pr.Team, error) {
+	if t.TeamName == "" {
+		return pr.Team{}, fmt.Errorf("team name required")
+	}
+	if len(t.Members) == 0 {
+		return pr.Team{}, ErrNoCandidate
+	}
+
+	tx := p.db.Begin()
+	if tx.Error != nil {
+		return pr.Team{}, tx.Error
+	}
+	defer tx.Rollback() 
+
+	var exists int64
+	if err := tx.Model(&pgdto.TeamModel{}).
+		Where("team_name = ?", t.TeamName).
+		Count(&exists).Error; err != nil {
+		return pr.Team{}, err
+	}
+	if exists > 0 {
+		return pr.Team{}, ErrTeamExists
+	}
+
+	if err := tx.Create(&pgdto.TeamModel{TeamName: t.TeamName}).Error; err != nil {
+		return pr.Team{}, err
+	}
+
+	for _, m := range t.Members {
+		if m.UserId == "" {
+			return pr.Team{}, ErrNotFound 
+		}
+		result := tx.Exec(`
+			UPDATE users 
+			SET team_name = ?, 
+			    is_active = ?, 
+			    username = ?
+			WHERE user_id = ? 
+			  AND (team_name IS NULL OR team_name = ?)`, // опционально: можно запретить перепривязку
+			t.TeamName, m.IsActive, m.Username, m.UserId, t.TeamName)
+
+		if result.Error != nil {
+			return pr.Team{}, result.Error
+		}
+		if result.RowsAffected == 0 {
+			var cnt int64
+			if err := tx.Model(&pgdto.UserModel{}).
+				Where("user_id = ?", m.UserId).
+				Count(&cnt).Error; err != nil {
+				return pr.Team{}, err
+			}
+			if cnt == 0 {
+				return pr.Team{}, ErrNotFound
+			}
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return pr.Team{}, err
+	}
+
+	var members []pr.TeamMember
+	if err := p.db.
+		Table("users").
+		Where("team_name = ?", t.TeamName).
+		Select("user_id", "username", "is_active").
+		Scan(&members).Error; err != nil {
+		return pr.Team{}, err
+	}
+
+	return pr.Team{
+		TeamName: t.TeamName,
+		Members:  members,
+	}, nil
 }

@@ -11,12 +11,10 @@ type Storage interface {
 	GetFreeReviewers(team string, authorid string) ([]User, error)
 	// // Пометить PR как MERGED (идемпотентная операция)
 	PullRequestMerge(id string) (PullRequest, error)
-	// // Переназначить конкретного ревьювера на другого из его команды
-	// // (POST /pullRequest/reassign)
+	// // Переназначить конкретного ревьювера на другого из его команды)
 	PullRequestReassign(r PostPullRequestReassign) (PullRequest, error)
 	// // Создать команду с участниками (создаёт/обновляет пользователей)
-	// // (POST /team/add)
-	// TeamAdd()
+	TeamAdd(t Team) (Team, error)
 	// // Получить команду с участниками
 	// // (GET /team/get)
 	// TeamGet()

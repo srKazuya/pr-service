@@ -27,6 +27,20 @@ type PullRequestReviewer struct {
 	UserID        string `gorm:"primaryKey;column:user_id;type:text"`
 }
 
+type TeamModel struct {
+	TeamName string `gorm:"primaryKey;column:team_name"`
+}
+
+type UserModel struct {
+	UserID   string  `gorm:"primaryKey;column:user_id"`
+	Username string  `gorm:"column:username"`
+	IsActive bool    `gorm:"column:is_active"`
+	TeamName *string `gorm:"column:team_name"` 
+}
+
+func (TeamModel) TableName() string { return "teams" }
+func (UserModel) TableName() string { return "users" }
+
 func (p *PullRequest) ToDomain() pr.PullRequest {
 	reviewers := make([]string, 0, len(p.AssignedReviewers))
 	for _, u := range p.AssignedReviewers {

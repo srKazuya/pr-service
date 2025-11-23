@@ -36,3 +36,18 @@ func PostPullRequestMapToModel(req PostPullRequestCreateJSONBody) pr.PullRequest
 		Status:            "OPEN",
 	}
 }
+
+func TeamMapToModel(req openapi.Team) pr.Team {
+	members := make([]pr.TeamMember, 0, len(req.Members))
+	for _, m := range req.Members {
+		members = append(members, pr.TeamMember{
+			IsActive: m.IsActive,
+			UserId:   m.UserId,
+			Username: m.Username,
+		})
+	}
+	return pr.Team{
+		Members:  members,
+		TeamName: req.TeamName,
+	}
+}

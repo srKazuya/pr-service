@@ -46,4 +46,8 @@ var (
 		code:    openapi.PRMERGED,
 		message: "у пользователя нет команды",
 	}
+	ErrTeamExists = codedError{
+		code:    openapi.TEAMEXISTS,
+		message: "Команда существует",
+	}
 )

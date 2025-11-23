@@ -5,22 +5,34 @@ import "time"
 type PullRequest struct {
 	// AssignedReviewers user_id назначенных ревьюверов (0..2)
 	AssignedReviewers []string   
-	AuthorId          string     `json:"author_id"`
-	CreatedAt         *time.Time `json:"createdAt"`
-	MergedAt          *time.Time `json:"mergedAt"`
-	PullRequestId     string     `json:"pull_request_id"`
-	PullRequestName   string     `json:"pull_request_name"`
-	Status            string     `json:"status"`
+	AuthorId          string    
+	CreatedAt         *time.Time 
+	MergedAt          *time.Time 
+	PullRequestId     string     
+	PullRequestName   string     
+	Status            string     
 }
 
 type User struct {
-	IsActive bool   `json:"is_active"`
-	TeamName string `json:"team_name"`
-	UserId   string `gorm:"primaryKey" json:"user_id" `
-	Username string `json:"username"`
+	IsActive bool   
+	TeamName string 
+	UserId   string 
+	Username string 
 }
 
 type PostPullRequestReassign struct {
-	OldUserId     string `json:"old_user_id"`
-	PullRequestId string `json:"pull_request_id"`
+	OldUserId     string 
+	PullRequestId string 
+}
+
+type Team struct {
+	Members  []TeamMember 
+	TeamName string       
+}
+
+// TeamMember defines model for TeamMember.
+type TeamMember struct {
+	IsActive bool   
+	UserId   string 
+	Username string 
 }

@@ -177,7 +177,7 @@ func (h *API) PostPullRequestReassign(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		switch {
-		case errors.Is(err, postgres.ErrNotFound): 
+		case errors.Is(err, postgres.ErrNotFound):
 			responseErr(w, http.StatusNotFound, postgres.ErrNotFound.Error())
 		case errors.Is(err, postgres.ErrReviewerNotInPR):
 			responseErr(w, http.StatusBadRequest, postgres.ErrReviewerNotInPR.Error())
@@ -202,6 +202,54 @@ func (h *API) PostPullRequestReassign(w http.ResponseWriter, r *http.Request) {
 // Создать команду с участниками (создаёт/обновляет пользователей)
 // (POST /team/add)
 func (h *API) PostTeamAdd(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.PostTeamAdd"
+	h.Log = h.Log.With(
+		slog.String("op", op),
+		slog.String("request_id", middleware.GetRequestID(r)),
+	)
+
+	var req openapi.Team
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.Log.Error("failed to decode request", sl.Err(err))
+		responseErr(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+
+	if err := validator.New().Struct(req); err != nil {
+		h.Log.Warn("validation failed", sl.Err(err))
+		_ = transport.WriteJSON(w, http.StatusBadRequest, validateResp.ValidationError(err.(validator.ValidationErrors)))
+		return
+	}
+
+	teamDomain := dto.TeamMapToModel(req)
+
+	createdTeam, err := h.Svc.TeamAdd(r.Context(), teamDomain)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrTeamExists):
+			h.Log.Warn("team already exists", slog.String("team", teamDomain.TeamName))
+			responseErr(w, http.StatusConflict, "команда уже существует")
+			return
+
+		case errors.Is(err, postgres.ErrNoCandidate):
+			h.Log.Warn("attempt to create empty team", slog.String("team", teamDomain.TeamName))
+			responseErr(w, http.StatusBadRequest, "в команде должен быть хотя бы один участник")
+			return
+
+		case errors.Is(err, postgres.ErrNotFound):
+			h.Log.Warn("user not found when creating team", slog.String("team", teamDomain.TeamName))
+			responseErr(w, http.StatusNotFound, "один или несколько пользователей не найдены")
+			return
+
+		default:
+			h.Log.Error("failed to create team", sl.Err(err), slog.String("team", teamDomain.TeamName))
+			responseErr(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
+			return
+		}
+	}
+
+	h.Log.Info("team created successfully", slog.String("team", createdTeam.TeamName))
+	teamRequestOK(w, createdTeam)
 }
 
 // Получить команду с участниками
@@ -235,13 +283,28 @@ func responseErr(w http.ResponseWriter, c int, m string) {
 func pullRequestOK(w http.ResponseWriter, pr pr.PullRequest) {
 	r := openapi.PullRequest{
 		AssignedReviewers: pr.AssignedReviewers,
-		CreatedAt: pr.CreatedAt,
-		MergedAt: pr.MergedAt,
-		AuthorId:        pr.AuthorId,
-		PullRequestId:   pr.PullRequestId,
-		PullRequestName: pr.PullRequestName,
-		Status:          openapi.PullRequestStatus(pr.Status),
+		CreatedAt:         pr.CreatedAt,
+		MergedAt:          pr.MergedAt,
+		AuthorId:          pr.AuthorId,
+		PullRequestId:     pr.PullRequestId,
+		PullRequestName:   pr.PullRequestName,
+		Status:            openapi.PullRequestStatus(pr.Status),
 	}
 	transport.WriteJSON(w, http.StatusOK, r)
 }
 
+func teamRequestOK(w http.ResponseWriter, pr pr.Team) {
+	members := make([]openapi.TeamMember, 0, len(pr.Members))
+	for _, m := range pr.Members {
+		members = append(members, openapi.TeamMember{
+			IsActive: m.IsActive,
+			UserId:   m.UserId,
+			Username: m.Username,
+		})
+	}
+	r := openapi.Team{
+		Members:  members,
+		TeamName: pr.TeamName,
+	}
+	transport.WriteJSON(w, http.StatusOK, r)
+}
