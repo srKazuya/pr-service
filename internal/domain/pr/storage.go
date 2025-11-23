@@ -20,7 +20,7 @@ type Storage interface {
 	TeamGet(teamName string)(Team, error)
 	// // Получить PR'ы, где пользователь назначен ревьювером
 	// // (GET /users/getReview)
-	// UsersGetReview()
+	UsersGetReview(id string)([]PullRequest, error)
 	// // Установить флаг активности пользователя
 	// // (POST /users/setIsActive)
 	// UsersSetIsActive()

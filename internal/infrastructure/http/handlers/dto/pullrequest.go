@@ -18,6 +18,19 @@ type PostPullRequestMergeJSONBody struct {
 	PullRequestId string `json:"pull_request_id" validate:"required"`
 }
 
+func UsersSetIsActiveToModel(p openapi.PostUsersSetIsActiveJSONBody) pr.UsersSetIsActive {
+	return pr.UsersSetIsActive{
+		IsActive: p.IsActive,
+		UserId:   p.UserId,
+	}
+}
+
+func GetUserToModel(p openapi.GetUsersGetReviewParams) pr.GetReviewParams {
+	return pr.GetReviewParams{
+		UserId: p.UserId,
+	}
+}
+
 func GetTeamToModel(t openapi.GetTeamGetParams) pr.TeamName {
 	return pr.TeamName{
 		TeamName: t.TeamName,

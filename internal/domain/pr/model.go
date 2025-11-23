@@ -38,6 +38,13 @@ type TeamMember struct {
 }
 
 type TeamName struct {
-	// TeamName Уникальное имя команды
 	TeamName string 
+}
+type GetReviewParams struct{
+	UserId string
+}
+
+type UsersSetIsActive struct{
+    IsActive bool  
+    UserId   string 
 }

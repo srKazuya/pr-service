@@ -330,27 +330,27 @@ func (p *PostgresStorage) TeamAdd(t pr.Team) (pr.Team, error) {
 		if m.UserId == "" {
 			return pr.Team{}, ErrNotFound
 		}
+
 		result := tx.Exec(`
 			UPDATE users 
 			SET team_name = ?, 
 			    is_active = ?, 
 			    username = ?
-			WHERE user_id = ? 
-			  AND (team_name IS NULL OR team_name = ?)`, // опционально: можно запретить перепривязку
-			t.TeamName, m.IsActive, m.Username, m.UserId, t.TeamName)
+			WHERE user_id = ?
+		`, t.TeamName, m.IsActive, m.Username, m.UserId)
 
 		if result.Error != nil {
 			return pr.Team{}, result.Error
 		}
+
 		if result.RowsAffected == 0 {
-			var cnt int64
-			if err := tx.Model(&pgdto.UserModel{}).
-				Where("user_id = ?", m.UserId).
-				Count(&cnt).Error; err != nil {
-				return pr.Team{}, err
-			}
-			if cnt == 0 {
-				return pr.Team{}, ErrNotFound
+			if err := tx.Create(&pgdto.UserModel{
+				UserID:   m.UserId,
+				Username: m.Username,
+				IsActive: m.IsActive,
+				TeamName: &t.TeamName,
+			}).Error; err != nil {
+				return pr.Team{}, fmt.Errorf("failed to create user %s: %w", m.UserId, err)
 			}
 		}
 	}
@@ -391,7 +391,7 @@ func (p *PostgresStorage) TeamGet(teamName string) (pr.Team, error) {
 	}
 
 	if len(userModels) == 0 {
-		return pr.Team{}, ErrNotFound 
+		return pr.Team{}, ErrNotFound
 	}
 
 	members := make([]pr.TeamMember, 0, len(userModels))
@@ -407,4 +407,33 @@ func (p *PostgresStorage) TeamGet(teamName string) (pr.Team, error) {
 		TeamName: teamName,
 		Members:  members,
 	}, nil
+}
+
+func (p *PostgresStorage) UsersGetReview(userID string) ([]pr.PullRequest, error) {
+	if userID == "" {
+		return nil, fmt.Errorf("user_id is required")
+	}
+
+	var prModels []pgdto.PullRequest
+
+	err := p.db.
+		Joins("JOIN pull_request_reviewers prr ON prr.pull_request_id = pull_requests.pull_request_id").
+		Where("prr.user_id = ?", userID).
+		Preload("AssignedReviewers"). 
+		Find(&prModels).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("postgres.UsersGetReview: query failed: %w", err)
+	}
+
+	if len(prModels) == 0 {
+		return []pr.PullRequest{}, nil
+	}
+
+	result := make([]pr.PullRequest, len(prModels))
+	for i, model := range prModels {
+		result[i] = model.ToDomain()
+	}
+
+	return result, nil
 }

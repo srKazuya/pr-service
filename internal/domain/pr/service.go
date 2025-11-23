@@ -13,6 +13,8 @@ type Service interface {
 	PullRequestReassign(ctx context.Context, r PostPullRequestReassign) (PullRequest, error)
 	TeamAdd(ctx context.Context, r Team) (Team, error)
 	TeamGet(ctx context.Context, r TeamName) (Team, error)
+	GetUsersReview(ctx context.Context, p GetReviewParams) ([]PullRequest, error)
+	UsersSetIsActive(ctx context.Context, u UsersSetIsActive) (error)
 }
 
 type service struct {
@@ -116,4 +118,24 @@ func (s *service) TeamGet(ctx context.Context, r TeamName) (Team, error) {
 		return Team{}, fmt.Errorf("%s: %w", op, err)
 	}
 	return team, err
+}
+func (s *service) GetUsersReview(ctx context.Context, p GetReviewParams) ([]PullRequest, error) {
+	const op = "service.GetUsersReview"
+
+	team, err := s.storage.UsersGetReview(p.UserId)
+	if err != nil {
+		return []PullRequest{}, fmt.Errorf("%s: %w", op, err)
+	}
+	return team, err
+}
+
+
+func (s *service)UsersSetIsActive(ctx context.Context, u UsersSetIsActive) (error) {
+	const op = "service.SetIsActive"
+
+	err := s.storage.UsersSetIsActive(u.UserId)
+	if err != nil {
+		return fmt.Errorf("%s: %w", op, err)
+	}
+	return err
 }

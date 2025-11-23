@@ -284,11 +284,90 @@ func (h *API) GetTeamGet(w http.ResponseWriter, r *http.Request, params openapi.
 // Получить PR'ы, где пользователь назначен ревьювером
 // (GET /users/getReview)
 func (h *API) GetUsersGetReview(w http.ResponseWriter, r *http.Request, params openapi.GetUsersGetReviewParams) {
+	const op = "handlers.UsersGetReview"
+	log := h.Log.With(
+		slog.String("op", op),
+		slog.String("request_id", middleware.GetRequestID(r)),
+	)
+	userID := dto.GetUserToModel(params)
+	reviews, err := h.Svc.GetUsersReview(r.Context(), userID)
+	if err != nil {
+		switch {
+		case errors.Is(err, postgres.ErrNotFound):
+			log.Warn("team not found")
+			responseErr(w, http.StatusNotFound, "команда не найдена")
+			return
+
+		default:
+			log.Error("failed to get team", sl.Err(err))
+			responseErr(w, http.StatusInternalServerError, "внутренняя ошибка сервера")
+			return
+		}
+	}
+
+	GetReviewOK(w, reviews)
 }
 
 // Установить флаг активности пользователя
 // (POST /users/setIsActive)
 func (h *API) PostUsersSetIsActive(w http.ResponseWriter, r *http.Request) {
+	const op = "handlers.PostPullRequestCreate"
+
+	h.Log = h.Log.With(
+		slog.String("op", op),
+		slog.String("request_id", middleware.GetRequestID(r)),
+	)
+
+	var req openapi.PostUsersSetIsActiveJSONBody
+
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusBadRequest, transport.ErrInvalidRequest.Error())
+		return
+	}
+
+	h.Log.Info("request body decoded", slog.Any("req", req))
+
+	if err := validator.New().Struct(req); err != nil {
+		validateErr := err.(validator.ValidationErrors)
+		h.Log.Error("invalid request", sl.Err(err))
+		_ = transport.WriteJSON(w, http.StatusBadRequest, validateResp.ValidationError(validateErr))
+		return
+	}
+
+	user := dto.UsersSetIsActiveToModel(req)
+
+	err = h.Svc.UsersSetIsActive(r.Context(), user)
+	if errors.Is(err, postgres.ErrNoCandidate) {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusInternalServerError, postgres.ErrNoCandidate.Error())
+		return
+	}
+	if errors.Is(err, postgres.ErrPrExists) {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusInternalServerError, postgres.ErrPrExists.Error())
+		return
+	}
+	if err != nil {
+		h.Log.Error("bad request",
+			slog.String("type", err.Error()),
+			sl.Err(err),
+		)
+		responseErr(w, http.StatusInternalServerError, "failed to пуе гыук")
+		return
+	}
+
+	userOK(w)
 }
 
 func responseErr(w http.ResponseWriter, c int, m string) {
@@ -331,4 +410,30 @@ func teamRequestOK(w http.ResponseWriter, pr pr.Team) {
 		TeamName: pr.TeamName,
 	}
 	transport.WriteJSON(w, http.StatusOK, r)
+}
+
+func GetReviewOK(w http.ResponseWriter, reviews []pr.PullRequest) {
+	if len(reviews) == 0 {
+		transport.WriteJSON(w, http.StatusOK, []openapi.PullRequest{})
+		return
+	}
+
+	resp := make([]openapi.PullRequest, len(reviews))
+	for i, pr := range reviews {
+		resp[i] = openapi.PullRequest{
+			PullRequestId:     pr.PullRequestId,
+			PullRequestName:   pr.PullRequestName,
+			AuthorId:          pr.AuthorId,
+			Status:            openapi.PullRequestStatus(pr.Status),
+			CreatedAt:         pr.CreatedAt,
+			MergedAt:          pr.MergedAt,
+			AssignedReviewers: pr.AssignedReviewers,
+		}
+	}
+
+	transport.WriteJSON(w, http.StatusOK, resp)
+}
+
+func userOK(w http.ResponseWriter) {
+	transport.WriteJSON(w, http.StatusOK, "user status changed OK")
 }
