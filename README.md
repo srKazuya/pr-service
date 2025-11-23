@@ -11,7 +11,7 @@
 - Валидация через **github.com/go-playground/validator**
 - Логирование — **slog**
 - **gofakeit** — сиды с реалистичными данными
-####Готовая коллекция с примерами всех запросов:
+### Готовая коллекция с примерами всех запросов:
 /Pull Requests.postman_collection.json
 
 ## Быстрый старт (Docker Compose)

@@ -138,6 +138,32 @@
 			"response": []
 		},
 		{
+			"name": "users/setIsActive",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"is_active\": true,\r\n    \"user_id\": \"f3f2b353-42b0-4ecd-bedd-9e5204013257\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}users/setIsActive",
+					"host": [
+						"{{base_url}}users"
+					],
+					"path": [
+						"setIsActive"
+					]
+				}
+			},
+			"response": []
+		},
+		{
 			"name": "team/add",
 			"request": {
 				"method": "POST",
