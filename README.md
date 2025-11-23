@@ -41,11 +41,11 @@ make drop                    # + удалить volume с БД (полная о�
 | —                              | `http_server.address`                 | Адрес и порт HTTP-сервера         | `0.0.0.0:8080`        | —                              |
 | —                              | `http_server.timeout`                 | Общий таймаут сервера             | `4s`                  | —                              |
 | —                              | `http_server.idle_timeout`            | Idle timeout                      | `30s`                 | —                              |
-| —                              | `database.host`                       | Хост PostgreSQL                   | `qa_postgres`         | —                              |
+| —                              | `database.host`                       | Хост PostgreSQL                   | `pr_postgres`         | —                              |
 | —                              | `database.port`                       | Порт PostgreSQL                   | `5432`                | —                              |
 | —                              | `database.user`                       | Пользователь БД                   | `postgres`            | —                              |
 | —                              | `database.password`                   | Пароль БД                         | `postgres`            | —                              |
-| —                              | `database.dbname`                     | Имя базы данных                   | `questions`           | —                              |
+| —                              | `database.dbname`                     | Имя базы данных                   | `pullrequest`         | —                              |
 | —                              | `database.sslmode`                    | Режим SSL                         | `disable`             | —                              |
 
 Миграции автоматически применяются при старте приложения.
