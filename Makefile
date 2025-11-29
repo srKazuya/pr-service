@@ -26,6 +26,8 @@ build:
 	docker-compose build --no-cache
 
 ## Сгенерировать openapi-код (один раз)
+rps:
+	k6 run test.js
 
 .PHONY: gen-openapi
 

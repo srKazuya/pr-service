@@ -64,7 +64,7 @@ func main() {
 	api := &handlers.API{Log: log, Svc: service}
 
 	openapi.HandlerFromMux(api, r)
-
+	
 	srv := &http.Server{
 		Addr:         cfg.Address,
 		Handler:      r,
@@ -93,7 +93,7 @@ func setupLogger(env string) *slog.Logger {
 		log = setupPrettySlog()
 	case envDev:
 		log = slog.New(
-			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}),
+			slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn}),
 		)
 	case envProd:
 		log = slog.New(

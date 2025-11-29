@@ -30,6 +30,10 @@ func New(cfg Config, log *slog.Logger) (*PostgresStorage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w: %w", op, ErrOpenDB, err)
 	}
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxIdleConns(100)
+	sqlDB.SetConnMaxLifetime(time.Minute * 5)
+	sqlDB.SetConnMaxIdleTime(time.Minute)
 	log.Info("start migrate...", slog.String("path", cfg.MigrationsPath))
 	if err := goose.Up(sqlDB, cfg.MigrationsPath); err != nil {
 		return nil, fmt.Errorf("%s: %w: %w", op, ErrMigration, err)
@@ -419,7 +423,7 @@ func (p *PostgresStorage) UsersGetReview(userID string) ([]pr.PullRequest, error
 	err := p.db.
 		Joins("JOIN pull_request_reviewers prr ON prr.pull_request_id = pull_requests.pull_request_id").
 		Where("prr.user_id = ?", userID).
-		Preload("AssignedReviewers"). 
+		Preload("AssignedReviewers").
 		Find(&prModels).Error
 
 	if err != nil {
